@@ -36,6 +36,16 @@ $(ROOTFS_DIR).base:
 		exit 1; \
 	fi
 	rm -f plugins.txt
+	for i in plugins/*; do \
+		if [ -f $$i/packages -o -f $$i/preinst -o -f $$i/postinst -o -d $$i/files -o -d $$i/patches ]; then \
+			echo $$i >> plugins.txt; \
+		fi; \
+	done
+	for i in plugins/$(DIST)/*; do \
+		if [ -f $$i/packages -o -f $$i/preinst -o -f $$i/postinst -o -d $$i/files -o -d $$i/patches ]; then \
+			echo $$i >> plugins.txt; \
+		fi; \
+	done
 	for j in $(REPOS); do \
 		for i in plugins/$$j/*; do \
 			if [ -f $$i/baseonly -a $$j != $(REPOBASE) ]; then \
@@ -46,24 +56,15 @@ $(ROOTFS_DIR).base:
 			fi; \
 		done; \
 	done
-	for i in plugins/$(DIST)/*; do \
-		if [ -f $$i/packages -o -f $$i/preinst -o -f $$i/postinst -o -d $$i/files -o -d $$i/patches ]; then \
-			echo $$i >> plugins.txt; \
-		fi; \
-	done
-	for i in plugins/*; do \
-		if [ -f $$i/packages -o -f $$i/preinst -o -f $$i/postinst -o -d $$i/files -o -d $$i/patches ]; then \
-			echo $$i >> plugins.txt; \
-		fi; \
-	done
 	@echo
-	@echo "Building $(IMAGE_FILE)_$(TIMESTAMP).img"
+	@echo "Building $(IMAGE_FILE)$${HOSTNAME:+_$(HOSTNAME)}_$(TIMESTAMP).img"
 	@echo "Repositories: $(REPOS)"
 	@echo "Base repositories: $(REPOBASE)"
 	@echo "Distribution: $(DIST)"
 	@echo "Repository architecture: $(DARCH)"
 	@echo "System architecture: $(ARCH)"
 	@echo "Plugins: $$(cat plugins.txt | xargs | sed -e 's;plugins/;;g' -e 's; ;, ;g')"
+	@[ $(HOSTNAME) ] && echo "Hostname: $(HOSTNAME)" || true
 	@echo
 	@echo -n "5..."
 	@sleep 1
@@ -147,15 +148,19 @@ $(ROOTFS_DIR): $(ROOTFS_DIR).base
 			done; \
 		fi; \
 	done
-	if ls plugins/*/files/etc/hostname 1> /dev/null 2>&1; then \
-		cp plugins/*/files/etc/hostname $@/etc/hostname; \
-	fi
-	if ls plugins/$(DIST)/*/files/etc/hostname 1> /dev/null 2>&1; then \
-		cp plugins/$(DIST)/*/files/etc/hostname $@/etc/hostname; \
+	if [ $(HOSTNAME) ]; then \
+		echo $(HOSTNAME) > $@/etc/hostname; \
+	else \
+		if ls plugins/*/files/etc/hostname 1> /dev/null 2>&1; then \
+			cp plugins/*/files/etc/hostname $@/etc/hostname; \
+		fi; \
+		if ls plugins/$(DIST)/*/files/etc/hostname 1> /dev/null 2>&1; then \
+			cp plugins/$(DIST)/*/files/etc/hostname $@/etc/hostname; \
+		fi; \
 	fi
 	if [ -f $@/etc/hostname ]; then \
-		if ! grep "^127.0.0.1\s*$$(cat $@/etc/hostname)\s*" $@/etc/hosts > /dev/null; then \
-			sed -i "1i 127.0.0.1\\t$$(cat $@/etc/hostname)" $@/etc/hosts; \
+		if ! grep "^127.0.1.1\s*$$(cat $@/etc/hostname)\s*" $@/etc/hosts > /dev/null; then \
+			sed -i "s/127.0.1.1.*/127.0.1.1\\t$$(cat $@/etc/hostname)/" $@/etc/hosts; \
 		fi; \
 	fi
 	if [ -f $@/$(BOOT_DIR)/config.txt -a "$(DARCH)" = "arm64" ]; then \
@@ -180,15 +185,16 @@ $(IMAGE_FILE): $(ROOTFS_DIR)
 	if test -f "$@.img.tmp"; then \
 		rm "$@.img.tmp"; \
 	fi
-	./createimg $@.img.tmp $(BOOT_MB) $(ROOT_MB) $(BOOT_DIR) $(ROOTFS_DIR) "$(ROOT_DEV)"
-	mv $@.img.tmp $@_$(TIMESTAMP).img
+	./createimg $@.img.tmp $(BOOT_MB) $(ROOT_MB) $(BOOT_DIR) $(ROOTFS_DIR) "$(ROOT_DEV)" $(HOSTNAME)
+	mv $@.img.tmp $@$${HOSTNAME:+_$(HOSTNAME)}_$(TIMESTAMP).img
 	@echo
-	@echo "Built $(IMAGE_FILE)_$(TIMESTAMP).img"
+	@echo "Built $(IMAGE_FILE)$${HOSTNAME:+_$(HOSTNAME)}_$(TIMESTAMP).img"
 	@echo "Repositories: $(REPOS)"
 	@echo "Base repositories: $(REPOBASE)"
 	@echo "Distribution: $(DIST)"
 	@echo "Repository architecture: $(DARCH)"
 	@echo "System architecture: $(ARCH)"
 	@echo "Plugins: $$(cat plugins.txt | xargs | sed -e 's;plugins/;;g' -e 's; ;, ;g')"
+	@[ $(HOSTNAME) ] && echo "Hostname: $(HOSTNAME)" || true
 	@echo
-	touch $@_$(TIMESTAMP).img
+	touch $@$${HOSTNAME:+_$(HOSTNAME)}_$(TIMESTAMP).img

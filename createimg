@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-if [ "$#" -ne 6 ]; then
-	echo "Usage: $0 OUTFILE BOOT_MEGABYTES TOTAL_MEGABYTES BOOT_DIR ROOTFS_DIR ROOT_DEV"
+if [ "$#" -lt 6 ]; then
+	echo "Usage: $0 OUTFILE BOOT_MEGABYTES TOTAL_MEGABYTES BOOT_DIR ROOTFS_DIR ROOT_DEV HOSTNAME"
 	exit 1
 fi
 
@@ -54,6 +54,7 @@ root_mb=$3
 boot_dir=$4
 rootfs_dir=$5
 root_dev=$6
+hostname=$7
 
 # needed + 40mb for first boot and resizing to work, just for logs and such
 needed_mb=$(($(du -s --block-size=1MB ${rootfs_dir} | awk {'print $1'}) + 40))
@@ -123,13 +124,13 @@ mkfs.ext4 -O $(./fsckoptlist $rootfs_dir/etc/mke2fs.conf) -b 4096 -E stride=1638
 root_uuid=`blkid $lodev | sed -n 's/.*UUID=\"\([^\"]*\)\".*/\1/p'`
 mkdir -p mnt
 mount -t ext4 $lodev mnt/
-rsync --quiet --archive --devices --specials --hard-links --acls --xattrs --sparse --exclude '/$boot_dir/' --exclude '/tmp/' --exclude '/media/' $rootfs_dir/* mnt/
+rsync --quiet --archive --devices --specials --hard-links --acls --xattrs --sparse --exclude "/$boot_dir/" --exclude "/tmp/" --exclude "/media/" $rootfs_dir/* mnt/
 mkdir -p mnt/boot
 mkdir -p mnt/media
 mkdir -p mnt/root
 mkdir -p mnt/tmp
 if [ -x "./createimg-rootfs-post" ] ; then
-	./createimg-rootfs-post mnt/ $boot_dir $boot_uuid $root_uuid
+	./createimg-rootfs-post mnt/ $boot_dir $boot_uuid $root_uuid $hostname
 fi
 umount_retry mnt
 losetup_delete_retry $lodev
