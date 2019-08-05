@@ -159,8 +159,10 @@ $(ROOTFS_DIR): $(ROOTFS_DIR).base
 		fi; \
 	fi
 	if [ -f $@/etc/hostname ]; then \
-		if ! grep "^127.0.1.1\s*$$(cat $@/etc/hostname)\s*" $@/etc/hosts > /dev/null; then \
+		if grep "^127.0.1.1\s*" $@/etc/hosts > /dev/null; then \
 			sed -i "s/127.0.1.1.*/127.0.1.1\\t$$(cat $@/etc/hostname)/" $@/etc/hosts; \
+		else \
+			echo "127.0.1.1	$$(cat $@/etc/hostname)" >> $@/etc/hosts;\
 		fi; \
 	fi
 	if [ -f $@/$(BOOT_DIR)/config.txt -a "$(DARCH)" = "arm64" ]; then \
